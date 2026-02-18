@@ -1,0 +1,43 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[top=3cm, bottom=3cm, left=3.5cm, right=3cm]{geometry}
+\usepackage[italian]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{lipsum}
+\usepackage{plantuml}
+\usepackage{textcomp}
+\usepackage{graphicx} 
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{emptypage}
+\usepackage{float}
+\usepackage{longtable}
+\input{commands}
+
+\begin{document}
+    \pagenumbering{gobble}
+    % Include document cover
+    \input{copertina}
+    %\emptypage
+    \input{dedica}
+    \newpage
+    \tableofcontents
+    \newpage
+
+    % capitoli
+    \pagenumbering{arabic}
+    \addcontentsline{toc}{section}{Introduzione}
+    \input{capitoli/introduzione}\newpage
+    \input{capitoli/fondamenti-teorici}\newpage
+    \input{capitoli/analisi-requisiti}\newpage
+    \input{capitoli/progettazione-sistema}\newpage
+
+    % bibliography
+    \addcontentsline{toc}{section}{Bibliografia}
+    \bibliographystyle{unsrt}
+    \bibliography{bibliography/reference}
+    
+    % ringraziamenti
+    \newpage
+    \addcontentsline{toc}{section}{Ringraziamenti}
+    \input{ringraziamenti}
+\end{document}

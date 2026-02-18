@@ -1,0 +1,105 @@
+% \section{Analisi requisiti}
+
+\section{Requisiti Funzionali}
+\subsection{Gestione del Calendario}
+Essendo il sistema in grado di fissare appuntamenti tra medico e paziente, il sistema permette di gestire un semplice calendario per la prenotazione di visite mediche. La gestione del calendario prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione del calendario
+    \item Creazione dell’evento
+    \item Retrieve degli eventi del calendario
+    \item Retrieve dei calendari appartenenti all’utente
+\end{itemize}
+
+\subsection{Gestione dei Reparti}
+Un ospedale è fondamentalmente costituito da reparti quindi l’altro compito fondamentale del software è quello di permettere di gestire il censimento dei reparti e tutto il resto che ne compete La gestione dei reparti prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione dei reparti
+    \item Censimento delle camere dei reparti
+    \item Censimento dei letti delle camere dei reparti
+    \item Assegnazione posto letto paziente
+    \item Rimozione posto letto paziente
+\end{itemize}
+
+\subsection{Gestione dei Dispositivi Medicali}
+Solitamente, i pazienti non ricevono un monitoraggio 24/7, basato sulla degenza, attraverso dispositivi come monitor multi-parametrici o altri. All’interno del progetto è stato ipotizzato un mondo idealistico in cui il monitoraggio del paziente viene preso sul serio e quindi ogni paziente riceve in assegnazione dei dispositivi tra cui monitor multi-parametrici per il monitoraggio costante dei parametri vitali. La gestione dei dispositivi medicali prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione di dispositivi medicali
+    \item Assegnazione dispositivi medicali al paziente
+    \item Rimozione dispositivi medicali dal paziente
+    \item Abilitazione e disabilitazione dei dispositivi
+    \item Inserimento dati rilevati in time-series database
+\end{itemize}
+
+
+\subsection{Gestione del Pronto Soccorso}
+Dal momento che tutta la gestione del software prevede che il paziente debba arrivare dal pronto soccorso e man mano scorrere all’interno dell’ospedale attraverso reparti e procedure, è di fondamentale importanza la gestione del pronto soccorso La gestione del pronto soccorso prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione del paziente
+    \item Apertura della cartella clinica
+    \item Caricamento dei documenti di pronto soccorso
+    \item Trasferimento in reparto sempre attraverso il caricamento dei documenti(ma non gestito automaticamente dal sistema)
+\end{itemize}
+
+\subsection{Gestione degli Esami Clinici}
+Essendo la parte di screening del paziente aﬀiancata dalla possibilità di eseguire esami clinici, il sistema permette di gestire esami di laboratorio e non. Ovviamente viene gestita anche la possibilità di creare nuove tipologie di esame correlato al censimento della strumentazione utilizzata. La gestione degli esami prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Aggiunta di strumentazione
+    \item Aggiunta di tipologia di esame
+    \item Modifica della strumentazione
+    \item Prescrizione dell’esame al paziente
+    \item Rimozione prescrizione esame paziente
+    \item Aggiunta di risultati all’esame
+    \item Visione dei risultati dell’esame
+\end{itemize}
+
+\subsection{Gestione della Cartella Clinica}
+Di fondamentale importanza è la cartella clinica che, come si può vedere all’interno della struttura del database tramite inizializzazione SQL, rappresenta il punto unico di raccolta delle informazioni relative al paziente all’interno di un lasso di tempo di permanenza in struttura. La gestione della cartella clinica prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Apertura della cartella clinica
+    \item Inserimento dei documenti relativi al pronto soccorso
+\end{itemize}
+
+\subsection{Gestione delle Scale di Valutazione}
+Di fondamentale importanza sono le scale di valutazione che permettono di avere nel tempo un quadro e monitoraggio delle funzionalità del paziente La gestione delle scale di valutazione prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione di un record
+    \item Visualizzazione di tutte le scale
+\end{itemize}
+
+\subsection{Gestione del Paziente}
+Dal momento che tutto l’ospedale gravita attorno al paziente, dobbiamo avere la possibilità dio gestire alcune cose semplici quindi. La gestione del paziente prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione del paziente
+    \item Retrieve dell’anagrafica del paziente
+    \item Assegnazione e modifica della residenza e del domicilio
+\end{itemize}
+
+\subsection{Gestione delle Operazioni Chirurgiche e delle Sale Chirurgiche}
+Dovendosi ritenere necessaria un operazione chirurgica, vi è la possibilità di schedulare interventi e gestirli. La gestione delle operazioni e delle sale prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione tipologia operazione
+    \item Creazione sala chirurgica
+    \item Scheduling dell’operazione
+    \item Rimozione dell’operazione
+    \item Posticipazione dell’operazione
+    \item Assegnazione team medico
+    \item Rimozione team medico
+\end{itemize}
+
+\subsection{Gestione della Scheda di Terapia  del Paziente}
+Dal momento che il paziente entra in reparto inizia un periodo, più o meno lungo di degenza ospedaliera, all’interno della quale dovrà sottoporti a una possibile terapia farmacologica, prescritta dal medico competente, che viene somministrata dal personale infermieristico La gestione della scheda di terapia prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Creazione della scheda di terapia
+    \item Assegnazione dei farmaci all’interno della terapia
+    \item Check della avvenuta somministrazione dei farmaci 
+\end{itemize}
+
+\subsection{Gestione dei Turni di Lavoro}
+Essendo un ospedale sopratutto un luogo di lavoro, vi è la possibilità di gestire
+i turni del personale.
+Ricorda che in questo ospedale non è ancora permesso prendere giorni di ferie o di malattia. La gestione dei turni di lavoro prevede le seguenti funzionalità:
+\begin{itemize}
+    \item Generazione automatica dei turni mensili
+    \item Aggiornamento del singolo turno
+    \item Retrieve dei turni mensili
+\end{itemize}

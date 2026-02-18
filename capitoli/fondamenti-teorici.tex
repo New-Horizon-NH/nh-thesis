@@ -1,0 +1,60 @@
+\section{Fondamenti Teorici}
+
+\subsection{Architettura a Microservizi: Definizione e vantaggi}
+
+L'architettura di microservizi suddivide un'applicazione in una serie di servizi distribuibili in modo indipendente che comunicano tramite API. In questo modo, ogni singolo servizio può essere distribuito e ridimensionato in maniera indipendente. Questo approccio consente di distribuire in modo rapido e frequente le applicazioni grandi e complesse. A differenza delle applicazioni monolitiche, l'architettura di microservizi consente ai team di implementare nuove funzioni e apportare modifiche più rapidamente, senza dover riscrivere gran parte del codice esistente \cite{atlassian_architettura_nodate}.
+\newline Alcune caratteristiche chiave dell'architettura a microservizi sono:
+\begin{itemize}
+    \item \textbf{Servizi con componenti multipli} \textrightarrow I microservizi sono costituiti da servizi con componenti debolmente accoppiati che possono essere sviluppati, distribuiti, utilizzati, modificati e ridistribuiti senza compromettere il funzionamento degli altri servizi o l'integrità dell'applicazione. Ciò consente di distribuire in modo rapido e semplice le singole funzioni di un'applicazione \cite{atlassian_architettura_nodate}.
+    \item \textbf{Elevate capacità di manutenzione e test} \textrightarrow I microservizi consentono ai team di sperimentare nuove funzioni ed eseguire il rollback se qualcosa va storto. Ciò semplifica l'aggiornamento del codice e accelera il time-to-market delle nuove funzioni. Inoltre, semplifica il processo di isolamento e correzione degli errori e dei bug nei singoli servizi \cite{atlassian_architettura_nodate}.
+    \item \textbf{Di proprietà di piccoli team} \textrightarrow In genere, i team piccoli e indipendenti creano un servizio all'interno dei microservizi, per questo motivo sono incoraggiati ad adottare le pratiche Agile e DevOps. I team hanno la possibilità di lavorare in modo indipendente e più rapidamente, riducendo i tempi del ciclo di sviluppo \cite{atlassian_architettura_nodate}.
+    \item \textbf{Organizzazione in base alle funzionalità aziendali} \textrightarrow Con i microservizi, è possibile organizzare i servizi in base alle funzionalità aziendali. I team sono interfunzionali e dispongono di tutte le competenze necessarie per sviluppare e soddisfare le singole funzionalità \cite{atlassian_architettura_nodate}.
+    \item \textbf{Infrastruttura automatizzata} \textrightarrow I team che si occupano della creazione e della gestione dei microservizi in genere utilizzano pratiche di automazione dell'infrastruttura come continuous integration (CI), continuous delivery (CD) e continuous deployment (anch'essa CD). Grazie a queste pratiche, i team possono creare e distribuire ciascun servizio in modo indipendente senza influire sugli altri team. Possono inoltre distribuire la nuova versione di un servizio fianco a fianco a quella precedente \cite{atlassian_architettura_nodate}.
+\end{itemize}
+
+\subsection{Differenze tra Microservizi e Architettura Monolitica}
+A differenza delle architetture monolitiche, dove tutti i componenti sono strettamente integrati in un'unica applicazione, i microservizi comunicano tra loro attraverso API REST, riducendo il rischio di guasti globali e facilitando l'aggiornamento dei singoli moduli.
+
+Nell'architettura monolitica:
+\begin{itemize}
+    \item Tutte le funzionalità sono incluse in un'unica applicazione.
+    \item Le modifiche al codice possono richiedere il riavvio dell'intero sistema.
+    \item L'uso delle risorse è meno ottimizzato rispetto ai microservizi.
+    \item La scalabilità è più difficile da gestire, poiché è necessario ridimensionare l'intera applicazione piuttosto che solo i componenti richiesti.
+\end{itemize}
+
+\subsection{Spring Boot: Introduzione a Spring Framework}
+Java Spring Boot è uno strumento open source che semplifica l'utilizzo di framework basati su Java per creare microservizi e app Web. Per qualsiasi definizione di Spring Boot bisogna iniziare con Java, uno dei linguaggi di sviluppo e una delle piattaforme di computing più popolari per lo sviluppo di app. Gli sviluppatori di tutto il mondo iniziano il loro viaggio nella codifica partendo da Java. Flessibile e intuitivo, Java è il preferito degli sviluppatori per un'ampia varietà di app: app per social media, Web, gaming, ma anche applicazioni aziendali e di rete \cite{microsoft_spring_boot}.
+
+\subsubsection{Caratteristiche di Spring Boot}
+Spring è un \textbf{framework di sviluppo open-source per Java} che semplifica la creazione di applicazioni aziendali complesse. È noto per semplificare il processo di sviluppo e favorire la scalabilità delle applicazioni \cite{vantaggi_spring_boot}. 
+
+Le principali caratteristiche di Spring includono:
+\begin{itemize}
+    \item L’implementazione dell’\textbf{Inversion of Control (IoC)}, un concetto che trasferisce il controllo della creazione e gestione degli oggetti dal programmatore al framework e che riduce la complessità del codice \cite{vantaggi_spring_boot}.
+    \item Si basa sul concetto di \textbf{dependency injection}, che permette di gestire le dipendenze tra gli oggetti in modo flessibile e modulare \cite{vantaggi_spring_boot}.
+    \item Un supporto per la \textbf{gestione delle transazioni} e la creazione di applicazioni modulari con componenti indipendenti \cite{vantaggi_spring_boot}.
+\end{itemize}
+
+Spring è molto diffuso in quanto framework ben consolidato e con una vasta comunità di sviluppatori e sottoposto a numerosi test che lo rendono utilizzabile per lo sviluppo di applicazioni di qualsiasi dimensione \cite{vantaggi_spring_boot}. 
+
+\subsection{Tecnologie Utilizzate}
+Nell'ottica di sviluppare un prodotto che dimostri una competenza globale nell'ultilizzo di svariati applicativi e tools, di seguito sono ripostati tutti gli strumenti utilizzati
+
+\subsubsection{MySQL}
+MySQL è un sistema di gestione di database relazionali (RDBMS) open-source, ampiamente utilizzato per la sua affidabilità, scalabilità e velocità. Basato su SQL (Structured Query Language), MySQL è impiegato in molte applicazioni web, tra cui siti di e-commerce, sistemi di gestione dei contenuti e applicazioni aziendali. Supporta transazioni, replica, clustering e diverse modalità di storage, tra cui InnoDB, che garantisce integrità referenziale e supporto per transazioni ACID. È compatibile con vari linguaggi di programmazione, come PHP, Java e Python, ed è parte integrante di stack tecnologici come LAMP (Linux, Apache, MySQL, PHP/Python/Perl).
+
+\subsubsection{MinIO}
+MinIO è una soluzione di storage distribuito compatibile con lo standard Amazon S3, progettata per gestire dati non strutturati su larga scala. È ottimizzato per l'uso in ambienti cloud-native e può essere utilizzato per archiviare grandi volumi di dati, come file multimediali, log, backup e dati per machine learning. Grazie alla sua architettura leggera e scalabile, MinIO può essere eseguito su qualsiasi infrastruttura, da piccoli server locali a grandi cluster distribuiti. Supporta funzionalità avanzate come versioning, crittografia e replica dei dati.
+
+\subsubsection{Spring Boot}
+Spring Boot è un framework basato su Java che semplifica lo sviluppo di applicazioni enterprise e microservizi. Fa parte dell'ecosistema Spring e fornisce un insieme di strumenti per la configurazione automatica, riducendo la complessità dell'implementazione. Grazie a Spring Boot, gli sviluppatori possono creare rapidamente applicazioni web, API RESTful e servizi cloud-native, senza la necessità di configurazioni manuali complesse. Include funzionalità integrate per sicurezza, gestione delle dipendenze e monitoraggio.
+
+\subsubsection{Keycloak}
+Keycloak è una soluzione open-source per la gestione dell'autenticazione e dell'autorizzazione basata su Single Sign-On (SSO), OAuth2, OpenID Connect e SAML. Consente alle applicazioni di integrare facilmente funzionalità di login, gestione degli utenti e controllo degli accessi. Grazie alla sua interfaccia intuitiva e alle API REST, Keycloak è ampiamente utilizzato per centralizzare l'autenticazione in architetture cloud-native e microservizi. Supporta anche l'integrazione con provider di identità esterni, come LDAP e Active Directory.
+
+\subsubsection{Kubernetes}
+Kubernetes è una piattaforma open-source per l'orchestrazione di container, progettata per automatizzare il deployment, la gestione e il scaling di applicazioni containerizzate. Basato su un'architettura a cluster, Kubernetes gestisce in modo efficiente risorse hardware, networking e bilanciamento del carico, garantendo alta disponibilità e resilienza. Supporta funzionalità come auto-scaling, service discovery, rolling updates e gestione dei volumi persistenti, rendendolo uno strumento essenziale per ambienti cloud-native.
+
+\subsubsection{Docker}
+Docker è una piattaforma per la creazione, distribuzione ed esecuzione di applicazioni in container. Un container è un'unità leggera e portabile che include tutto il necessario per eseguire un'applicazione, eliminando problemi di compatibilità tra ambienti di sviluppo, test e produzione. Docker semplifica il deployment di applicazioni su qualsiasi infrastruttura, migliorando la scalabilità e la sicurezza. Con Docker Compose, è possibile definire e gestire facilmente applicazioni multi-container.

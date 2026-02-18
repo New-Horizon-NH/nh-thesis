@@ -1,0 +1,964 @@
+\section{Progettazione Sistema}
+
+\subsection{Architettura}
+Essendo un sistema di una certa complessità, è stata necessaria la suddivisione in servizi più manutenibili e gestibili. Architetturalmente abbiamo i seguenti componenti:
+\begin{itemize}
+    \item \textbf{nh-api-gateway} \textrightarrow servizio Spring fondamentale perché ci permette di centralizzare tutte le logiche di sicurezza e di instradare secondo RBAC il traﬀico verso i servizi sottostanti
+    \item \textbf{nh-authentication-support-service} \textrightarrow servizio Spring che permette le interazioni con Keycloak come identity provider e per la gestione esternalizzata di JWT e OAuth2
+    \item \textbf{nh-monolithic-application} \textrightarrow servizio Spring che mantiene il cuore pulsante di tutta l’architettura e che si occupa di tutta la gestione dei punti dell’introduzione
+    \item \textbf{nh-fast-service} \textrightarrow servizio Python che si occupa di propagare la comunicazione di registrazione paziente e personale sia al servizio monolitico che al servizio di comuncazione con keycloak
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/architecture.png}
+  \caption{Architettura di Sistema}
+  \label{fig:arcitecture.png}
+\end{figure}
+
+\subsection{Api Gateway}
+\textbf{nh-api-gateway} rappresenta il primo livello di interfacciamento con il resto del sistema. Esso infatti è responsabile dell’instradamento del traﬀico verso le componenti interne del sistema e quindi ha il compito di comunicare con:
+\begin{itemize}
+    \item \textbf{nh-authentication-support-service} \textrightarrow per poter gestire login, refresh e logout dell’utente all’interno del sistema attraverso il servizio keycloak
+    \item \textbf{keycloak} \textrightarrow per poter ottenere i certificati per la validazione dei jwt lungo le rotte private del gateway
+    \item \textbf{nh-monolithic-application} \textrightarrow per poter effettivamente usare le implementazioni del sistema ospedaliero in toto
+    \item \textbf{nh-fast-service} \textrightarrow per poter generare in maniera sincrona l'utenza del paziente o del personale sia all'interno del sistema che all'interno di keycloak
+\end{itemize}
+
+\paragraph{Accesso personale vs. Accesso pubblico}\mbox{}
+\newline Essendo il sistema accessibile da due figure distinte ovvero
+\begin{itemize}
+    \item personale dipendente della struttura
+    \item paziente in cura alla struttura
+\end{itemize}
+è stato necessario configurare due istante di api-gateway che fanno riferimento
+a due realm diversi all’interno di keycloak attraverso due istanze diverse di
+\textbf{nh-authentication-support-service} infatti avremo
+
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/api-gateway.png}
+  \caption{Architettura API Gateway e Accesso}
+  \label{fig:api-gateway.png}
+\end{figure}
+
+\subsection{Authentication Support Service}
+\textbf{nh-authentication-support-service} è il servizio che ha il compito di interfacciarsi con kaycloak che, nel caso specifico, si occupa del mantenimento e della gestione di tutte le  utenze presenti all’interno del sistema e ci permette di poter gestire facilmente la multi-tenancy per avere utenze distinte tra personale lavoratore della struttura e pazienti che visionano esternamente i dati in maniera controllata e supervisionata dall’api-gateway configurato appositamente. Come mostrato nella sezione precedente, il servizio viene configurato in due diversi modi infatti keycloak avrà la seguente configurazione:
+\begin{itemize}
+    \item realm \textbf{new-horizon-internal}
+    \item realm \textbf{new-horizon-external}
+\end{itemize}
+I due realm distinti permettono di distinguere le utenze tra il personale interno e le utenze esterne di accesso meno privilegiato. Keycloak, permettendoci di lavorare in stateless, fornirà JWT per l’accesso agli endpoint e JWT per il refresh del JWT di accesso. I principali flussi esposti dal servizio sono:
+
+\paragraph{Login}\mbox{}
+\newline Flusso di login che mostra solo il caso di SUCCESS
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/001-user-login.png}
+  \caption{Flusso di Login}
+  \label{fig:login.png}
+\end{figure}
+
+\paragraph{Refresh}\mbox{}
+\newline Flusso di refresh che mostra solo il caso di SUCCESS
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/002-user-refresh.png}
+  \caption{Flusso di Refresh}
+  \label{fig:refresh.png}
+\end{figure}
+
+\paragraph{Logout}\mbox{}
+\newline Flusso di logout che mostra solo il caso di SUCCESS
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/003-user-logout.png}
+  \caption{Flusso di Logout}
+  \label{fig:logout.png}
+\end{figure}
+
+\subsection{Monolithic Application}
+\textbf{nh-monolithic-application} è il servizio principale che permette a tutto il sistema di svolgere il compito per cui è stato studiato. Come inserito nella introduzione, i compiti principali del monolite sono:
+\begin{itemize}
+    \item Gestire il calendario
+    \item Gestire il reparto
+    \item Gestire il dispositivo
+    \item Gestire il pronto soccorso
+    \item Gestire l’esame
+    \item Gestire la cartella clinica
+    \item Gestire il personale
+    \item Gestire la scala di valutazione
+    \item Gestire il paziente
+    \item Gestire il farmaco
+    \item Gestire il turni del personale
+    \item Gestire l’intervento
+    \item Gestire la terapia farmacologica
+\end{itemize}
+Di seguito verrà riportata la struttura di ogni singolo controller per l’interfacciamento con i possibili codici di risposta. Alcuni controller non hanno tutti i metodi implementati causa mancanza di tempo per gli sviluppi ma al fine della presentazione verranno inseriti per evitare interruzioni.
+
+\paragraph{Persistenza}\mbox{}
+\newline La gestione della persistenza in un progetto di questa portata è di fondamentale importanza pertanto è stato necessario introdurre un tool che ci permette di mantenere la consistenza del database in caso di errore da parte di un possibile sviluppatore. Il tool in questione è liquibase che ci permette di definire gli script sql che vengono eseguiti per generare il database. Tutti gli script possono essere visualizzati all’interno di \textbf{nh-monolithic-application} al path \textbf{classpath:/db/changelog/}. I file sono di proposito numerati con un numero a tre cifre in modo tale che l’esecuzione sia in ordine di inserimento e non alfabetico.
+
+\paragraph{Diagrammi di Flusso}\mbox{}
+\newline Generalizzando il comportamento di ogni endpoint presente all’interno del sistema avremo un comportamento come segue.
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/001-generic-behaviour.png}
+  \caption{Flusso Generico sul Microservizio}
+  \label{fig:generic.png}
+\end{figure}
+In generale ogni servizio del sistema esegue una serie di validazioni per processare la richiesta e torna codici di errore distinti in caso ci sia un errore controllato o non controllato. Di seguito vengono riportati i controller con i relativi metodi
+
+\begin{enumerate}
+    \item \textbf{CalendarController}
+        \begin{enumerate}
+            \item \textbf{Crea un nuovo calendario} 
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/calendar}
+                \newline Possibili codici risposta:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item MEDICAL\_CALENDAR\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea un nuovo evento}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/calendar/event}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_CALENDAR\_NOT\_FOUND
+                    \item SCHEDULING\_CONFLICT
+                    \item PATIENT\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Recupera calendari personali}
+                \newline\newline\emph{GET localhost:8080/nh-monolithic-application/v1/calendar/list}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                \end{itemize}
+            \item \textbf{Recupera eventi del calendario}
+                \newline\newline\emph{GET localhost:8080/nh-monolithic-application/v1/calendar/events}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item MEDICAL\_CALENDAR\_NOT\_FOUND
+                    \item CALENDAR\_DO\_NOT\_BELONG\_TO\_USER
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{DepartmentController}
+        \begin{enumerate}
+            \item \textbf{Crea un nuovo reparto}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/department}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DEPARTMENT\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea una nuova camera}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/department/room}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DEPARTMENT\_NOT\_FOUND
+                    \item ROOM\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea un nuovo posto letto}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/department/room/bed}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DEPARTMENT\_NOT\_FOUND
+                    \item ROOM\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Assegna posto letto al paziente}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/department/room/bed/assign}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item DEPARTMENT\_NOT\_FOUND
+                    \item ROOM\_NOT\_FOUND
+                    \item BED\_NOT\_FOUND
+                    \item BED\_ALREADY\_ASSIGNED
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Rimuovi assegnazione posto letto dal paziente}
+                \newline\newline\emph{DELETE localhost:8080/nh-monolithic-application/v1/department/room/bed/assign}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item DEPARTMENT\_NOT\_FOUND
+                    \item ROOM\_NOT\_FOUND
+                    \item BED\_NOT\_FOUND
+                    \item BED\_NOT\_ASSIGNED
+                    \item PATIENT\_NOT\_ASSIGNED\_TO\_GIVEN\_BED
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{DeviceController}
+        \begin{enumerate}
+            \item \textbf{Genera credenziali per device}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/device/login}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item NOT\_IMPLEMENTED
+                \end{itemize}
+            \item \textbf{Registra un nuovo device}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/device}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DEVICE\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Update device}
+                \newline\newline\emph{PUT localhost:8080/nh-monolithic-application/v1/device}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item NOT\_IMPLEMENTED
+                \end{itemize}
+            \item \textbf{Assegna device a un paziente}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/device/assign}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item DEVICE\_NOT\_FOUND
+                    \item DEVICE\_NOT\_ENABLED
+                    \item DEVICE\_ALREADY\_ASSIGNED
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Elimina assegnazione device da un paziente}
+                \newline\newline\emph{DELETE localhost:8080/nh-monolithic-application/v1/device/assign}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item DEVICE\_NOT\_FOUND
+                    \item DEVICE\_NOT\_ENABLED
+                    \item PATIENT\_NOT\_ASSIGNED\_TO\_GIVEN\_DEVICE
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Abilita o disabilita device}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/device/toggle}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DEVICE\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{EmergencyRoomController}
+        \begin{enumerate}
+            \item \textbf{Upload documenti dal pronto soccorso}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/er/document}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item MEDICAL\_CHART\_NOT\_FOUND
+                    \item ERROR\_UPLOADING\_ER\_DOCUMENT
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{ExamController}
+        \begin{enumerate}
+            \item \textbf{Recupera esame}
+                \newline\newline\emph{GET localhost:8080/nh-monolithic-application/v1/exam}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item NOT\_IMPLEMENTED
+                \end{itemize}
+            \item \textbf{Prescrivi esame}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/exam}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item EXAM\_CODE\_NOT\_FOUND
+                    \item MEDICAL\_CHART\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Upload risultati esame}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/exam/result}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PRESCRIBED\_EXAM\_NOT\_FOUND
+                    \item ERROR\_UPLOADING\_EXAM\_RESULT
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Retrieve risultati esame}
+                \newline\newline\emph{GET localhost:8080/nh-monolithic-application/v1/exam/result}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PRESCRIBED\_EXAM\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea nuova tipologia esame}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/exam/inventory/type}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item EXAM\_CODE\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea macchina per esame}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/exam/inventory/machine}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item EXAM\_CODE\_NOT\_FOUND
+                    \item MACHINE\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Update macchina per esame}
+                \newline\newline\emph{PUT localhost:8080/nh-monolithic-application/v1/exam/inventory/machine}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MACHINE\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{MedicalChartController}
+        \begin{enumerate}
+            \item \textbf{Crea nuova cartella clinica}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/chart}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item MEDICAL\_CHART\_OPENED\_DETECTED
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{MedicalTeamController}
+        \begin{enumerate}
+            \item \textbf{Crea un nuovo membro}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/medical/member}
+                Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
+    \item \textbf{NursingRatingScaleController}
+        \begin{enumerate}
+            \item \textbf{Registra scala di valutazione}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/nrs}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item NURSING\_RATING\_SCALE\_CODE\_NOT\_FOUND
+                    \item MEDICAL\_CHART\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Recupera tutte le scale di valutazione}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/nrs/all}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_CHART\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{PatientController}
+        \begin{enumerate}
+            \item \textbf{Recupera i miei pazienti attualmente seguiti}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/patient/myPatientList}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Recupera i miei pazienti attualmente seguiti}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/patient/myPatientList}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Genera chiamata di telemedicina}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/patient/meet}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Registra paziente al sistema}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/patient}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_ALREADY\_EXISTS
+                    \item GENDER\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Recupera anagrafica paziente}
+                \newline\newline\emph{GET localhost:8080/nh-monolithic-application/v1/patient/anagrafica}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item GENDER\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Assegna medico al paziente}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/patient/assignDoctor}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item PATIENT\_NOT\_FOUND
+                    \item MEDICAL\_CHART\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{PharmacyController}
+        \begin{enumerate}
+            \item \textbf{Crea nuovo farmaco}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/pharmacy/drug}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DRUG\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea nuova confezione per farmaco}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/pharmacy/drug/package}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DRUG\_NOT\_FOUND
+                    \item DRUG\_PACKAGE\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Ritira confezione o confezioni di un farmaco}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/pharmacy/withdraw}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DRUG\_PACKAGE\_NOT\_FOUND
+                    \item DRUG\_QUANTITY\_NOT\_AVAILABLE
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Aggiorna fornitura di un farmaco}
+                \newline\newline\emph{PUT localhost:8080/nh-monolithic-application/v1/pharmacy/drug}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item DRUG\_PACKAGE\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{ShiftController}
+        \begin{enumerate}
+            \item \textbf{Autogenerazione turni mensili}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/shift/generate}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item WORK\_SHIFT\_CODE\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Modifica singolo turno}
+                \newline\newline\emph{PUT localhost:8080/nh-monolithic-application/v1/shift}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item WORK\_SHIFT\_CODE\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Recupera turni del mese}
+                \newline\newline\emph{GET localhost:8080/nh-monolithic-application/v1/shift}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{SurgeryController}
+        \begin{enumerate}
+            \item \textbf{Programma operazione}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/surgery/schedule}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item MEDICAL\_CHART\_NOT\_FOUND
+                    \item SURGERY\_TYPE\_NOT\_FOUND
+                    \item SURGICAL\_ROOM\_NOT\_FOUND
+                    \item SURGERY\_START\_AFTER\_END
+                    \item SCHEDULING\_CONFLICT
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Elimina operazione programmata}
+                \newline\newline\emph{DELETE localhost:8080/nh-monolithic-application/v1/surgery/schedule}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item SCHEDULED\_SURGERY\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Riprogramma operazione programmata}
+                \newline\newline\emph{PUT localhost:8080/nh-monolithic-application/v1/surgery/schedule}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item SCHEDULED\_SURGERY\_NOT\_FOUND
+                    \item SCHEDULING\_CONFLICT
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea sala operatoria}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/surgery/room}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item SURGICAL\_ROOM\_ALREADY\_EXISTS
+                    \item SURGICAL\_ROOM\_TYPE\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Crea tipologia sala operatoria}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/surgery/room/type}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item SURGERY\_TYPE\_ALREADY\_EXISTS
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{TherapyController}
+        \begin{enumerate}
+            \item \textbf{Creazione scheda di terapia}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/therapy/sut}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item PATIENT\_NOT\_FOUND
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item MEDICAL\_CHART\_NOT\_FOUND
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Asseganzione terapia}
+                \newline\emph{Per terapia si intende l'assegnazione del singolo farmaco nelle quantità indicate}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/therapy}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item SUT\_NOT\_FOUND
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item DRUG\_PACKAGE\_NOT\_FOUND
+                    \item ADMINISTRATION\_TYPE\_CODE\_NOT\_FOUND
+                    \item TREATMENT\_ALREADY\_IN\_SUT
+                    \item GENERIC\_ERROR
+                \end{itemize}
+            \item \textbf{Segna somministrazioni}
+                \newline\newline\emph{POST localhost:8080/nh-monolithic-application/v1/therapy/check}
+                \newline Possibili codici di errore:
+                \begin{itemize}
+                    \item OK
+                    \item THERAPY\_ENTRY\_NOT\_FOUND
+                    \item MEDICAL\_MEMBER\_NOT\_FOUND
+                    \item ADMINISTRATION\_STATUS\_CODE\_NOT\_FOUND
+                    \item ADMINISTRATION\_NUMBER\_REACHED
+                    \item GENERIC\_ERROR
+                \end{itemize}
+        \end{enumerate}
+\end{enumerate}
+
+\paragraph{Testing}\mbox{}
+\newline Per ottenere un prodotto testato e stabile, sono stati scritti test di integrazione che sfruttano la tecnologia di Testcontainers per creare dei container durante l’esecuzione dei test che permettono il testing di tutte le parti del codice senza la necessità di dover mokkare informazioni. Questo è stato possibile poichè il sistema non esegue chiamate esterne ma sfrutta direttamente le dipendenze dei container per poter eseguire il testing. Nel caso in cui l’applicativo avesse effettuato chiamate web all’esterno, in tal caso sarebbe stato necessario inserire dei mock. Sempre per aﬀiancare lo sviluppo dei test con metodi più flessibili è stato utilizzato Instancio come tool per semplificare la creazione degli oggetti di request per i service testati. D’altronde la bravura non è solo nello scrivere il codice ma anche saper utilizzare le tecnologie. Di seguito l’attuale coverage
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/coverage_report.jpg}
+  \caption{Test Coverage}
+  \label{fig:coverage.png}
+\end{figure}
+\subsection{Fast Service}
+\textbf{nh-fast-service} è un servizio scritto interamente in python che permette in maniera snella di interfacciarsi con keycloak per la creazione di nuovi utenti e inoltrare la stessa richiesta al \textbf{nh-monolithic-application} per poter eseguire la stessa operazione sul sistema
+
+\paragraph{Creazione paziente}\mbox{}
+\newline La creazione del paziente segue il diagramma seguente
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/001-patient-register.png}
+  \caption{Flusso di Registrazione Paziente}
+  \label{fig:patient_register.png}
+\end{figure}
+Come si può osservare la creazione prevede l’interazione sia con il sistema di keycloak sia con il microservizio monolite principale
+
+\paragraph{Creazione utente interno}\mbox{}
+\newline La creazione del dipendente segue il diagramma seguente
+\begin{figure}[H]
+    \centering
+  \includegraphics[width=\linewidth]{figures/002-medical-register.png}
+  \caption{Flusso di Registrazione Dipendente}
+  \label{fig:worker_register.png}
+\end{figure}
+Come si può osservare la creazione prevede l’interazione sia con il sistema di
+keycloak sia con il microservizio monolite principale
+
+
+\subsection{Codici di Risposta}
+Di seguito sono riportati tutti i codici di risposta della piattaforma. 
+\begin{longtable}{l|l}
+    \textbf{ErrorCode} & \textbf{Content} \\
+    \hline
+0 & EnumName: OK \\
+		& Description:  \\
+		& HttpStatus: 200 OK \\
+		& InternalStatus: SUCCESS \\
+	\hline
+	1 & EnumName: OK\_EMPTY \\
+		& Description: Empty response \\
+		& HttpStatus: 204 NO\_CONTENT \\
+		& InternalStatus: SUCCESS \\
+	\hline
+	-101 & EnumName: BAD\_CREDENTIALS \\
+		& Description: Invalid credentials \\
+		& HttpStatus: 401 UNAUTHORIZED \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-102 & EnumName: INVALID\_CLIENT\_CONFIGURATION \\
+		& Description: Invalid auth client configuration \\
+		& HttpStatus: 503 SERVICE\_UNAVAILABLE \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-103 & EnumName: UNHAUTORIZED\_CLIENT \\
+		& Description: Auth client is not authorized to perform invoked operation \\
+		& HttpStatus: 500 INTERNAL\_SERVER\_ERROR \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-104 & EnumName: BAD\_GRANT\_TYPE \\
+		& Description: Unsupported grant type \\
+		& HttpStatus: 503 SERVICE\_UNAVAILABLE \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-401 & EnumName: BAD\_PARAMETER \\
+		& Description: Bad input parameters \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-402 & EnumName: UNAUTHORIZED \\
+		& Description: Unauthorized \\
+		& HttpStatus: 401 UNAUTHORIZED \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-500 & EnumName: GENERIC\_ERROR \\
+		& Description: Generic Error \\
+		& HttpStatus: 500 INTERNAL\_SERVER\_ERROR \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-501 & EnumName: NOT\_IMPLEMENTED \\
+		& Description: Not Implemented \\
+		& HttpStatus: 501 NOT\_IMPLEMENTED \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-600 & EnumName: DEPARTMENT\_ALREADY\_EXISTS \\
+		& Description: Department already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-601 & EnumName: ROOM\_ALREADY\_EXISTS \\
+		& Description: Room already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-602 & EnumName: DEPARTMENT\_NOT\_FOUND \\
+		& Description: Department not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-603 & EnumName: ROOM\_NOT\_FOUND \\
+		& Description: Room not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-604 & EnumName: BED\_NOT\_FOUND \\
+		& Description: Bed not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-605 & EnumName: PATIENT\_NOT\_FOUND \\
+		& Description: Patient not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-606 & EnumName: DEVICE\_ALREADY\_EXISTS \\
+		& Description: Device already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-607 & EnumName: DEVICE\_NOT\_FOUND \\
+		& Description: Device not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-608 & EnumName: DEVICE\_NOT\_ENABLED \\
+		& Description: Device not enabled \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-609 & EnumName: DEVICE\_ALREADY\_ASSIGNED \\
+		& Description: Device already assigned \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-610 & EnumName: DEVICE\_NOT\_ASSIGNED \\
+		& Description: Device is not assigned \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-611 & EnumName: PATIENT\_NOT\_ASSIGNED\_TO\_GIVEN\_DEVICE \\
+		& Description: Provided patient is not assigned to given device \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-612 & EnumName: BED\_ALREADY\_ASSIGNED \\
+		& Description: Bed already assigned \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-613 & EnumName: PATIENT\_NOT\_ASSIGNED\_TO\_GIVEN\_BED \\
+		& Description: Provided patient is not assigned to given bed \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-614 & EnumName: BED\_NOT\_ASSIGNED \\
+		& Description: Bed is not assigned \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-615 & EnumName: MEDICAL\_CHART\_OPENED\_DETECTED \\
+		& Description: A medical chart open is detected \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-616 & EnumName: EXAM\_CODE\_NOT\_FOUND \\
+		& Description: Provided exam code do not exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-617 & EnumName: MEDICAL\_CHART\_NOT\_FOUND \\
+		& Description: Medical chart do not exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-618 & EnumName: EXAM\_NOT\_ASSIGNED\_TO\_GIVEN\_PATIENT \\
+		& Description: Provided exam is not assigned to given patient \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-619 & EnumName: EXAM\_NOT\_REMOVABLE \\
+		& Description: Exam is in a state that can not allow the deletion \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-620 & EnumName: ERROR\_UPLOADING\_EXAM\_RESULT \\
+		& Description: Error occurred uploading exam result \\
+		& HttpStatus: 500 INTERNAL\_SERVER\_ERROR \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-621 & EnumName: EXAM\_CODE\_ALREADY\_EXISTS \\
+		& Description: Exam with same code already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-622 & EnumName: MACHINE\_ALREADY\_EXISTS \\
+		& Description: Machine serial already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-623 & EnumName: MACHINE\_NOT\_FOUND \\
+		& Description: Machine not found \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-624 & EnumName: SURGICAL\_ROOM\_ALREADY\_EXISTS \\
+		& Description: Surgical Room already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-625 & EnumName: SURGICAL\_ROOM\_NOT\_FOUND \\
+		& Description: Machine not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-626 & EnumName: SURGICAL\_ROOM\_TYPE\_NOT\_FOUND \\
+		& Description: Surgical Room Type not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-627 & EnumName: SURGERY\_TYPE\_ALREADY\_EXISTS \\
+		& Description: Surgery Type already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-628 & EnumName: SURGERY\_TYPE\_NOT\_FOUND \\
+		& Description: Surgery Type not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-629 & EnumName: SURGERY\_START\_AFTER\_END \\
+		& Description: Surgery start cannot be after surgery end \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-623 & EnumName: SCHEDULING\_CONFLICT \\
+		& Description: Scheduling conflict \\
+		& HttpStatus: 409 CONFLICT \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-631 & EnumName: SCHEDULED\_SURGERY\_NOT\_FOUND \\
+		& Description: Scheduled surgery not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-632 & EnumName: ACTIVE\_INGREDIENT\_ALREADY\_EXISTS \\
+		& Description: Active Ingredient already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-633 & EnumName: DRUG\_ALREADY\_EXISTS \\
+		& Description: Drug already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-634 & EnumName: ASSOCIATION\_ALREADY\_EXISTS \\
+		& Description: Drug with ingredient association already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-635 & EnumName: DRUG\_NOT\_FOUND \\
+		& Description: Drug not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-636 & EnumName: DRUG\_PACKAGE\_ALREADY\_EXISTS \\
+		& Description: Drug package already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-637 & EnumName: DRUG\_PACKAGE\_NOT\_FOUND \\
+		& Description: Drug package not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-638 & EnumName: DRUG\_QUANTITY\_NOT\_AVAILABLE \\
+		& Description: Drug quantity not available \\
+		& HttpStatus: 422 UNPROCESSABLE\_ENTITY \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-639 & EnumName: NURSING\_RATING\_SCALE\_CODE\_NOT\_FOUND \\
+		& Description: Nursing rating scale code not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-640 & EnumName: MEDICAL\_MEMBER\_ALREADY\_EXISTS \\
+		& Description: Medical member already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-641 & EnumName: MEDICAL\_MEMBER\_NOT\_FOUND \\
+		& Description: Medical member not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-642 & EnumName: ERROR\_UPLOADING\_ER\_DOCUMENT \\
+		& Description: Error uploading Emergency Room Document \\
+		& HttpStatus: 500 INTERNAL\_SERVER\_ERROR \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-643 & EnumName: MEDICAL\_CALENDAR\_ALREADY\_EXISTS \\
+		& Description: Medical calendar already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-644 & EnumName: MEDICAL\_CALENDAR\_NOT\_FOUND \\
+		& Description: Medical calendar not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-645 & EnumName: CALENDAR\_DO\_NOT\_BELONG\_TO\_USER \\
+		& Description: Calendar do not belong to user \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-646 & EnumName: WORK\_SHIFT\_CODE\_NOT\_FOUND \\
+		& Description: Work shift code not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-647 & EnumName: WORK\_SHIFT\_ASSOCIATION\_NOT\_FOUND \\
+		& Description: Work shift association not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-648 & EnumName: ADMINISTRATION\_TYPE\_CODE\_NOT\_FOUND \\
+		& Description: Administration type code not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-649 & EnumName: TREATMENT\_ALREADY\_IN\_SUT \\
+		& Description: Treatment already in sut \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-650 & EnumName: THERAPY\_ENTRY\_NOT\_FOUND \\
+		& Description: therapy entry not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-651 & EnumName: ADMINISTRATION\_STATUS\_CODE\_NOT\_FOUND \\
+		& Description: Administration status code not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-652 & EnumName: ADMINISTRATION\_NUMBER\_REACHED \\
+		& Description: Administration number reached \\
+		& HttpStatus: 422 UNPROCESSABLE\_ENTITY \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-653 & EnumName: PATIENT\_ALREADY\_EXISTS \\
+		& Description: Patient already exists \\
+		& HttpStatus: 400 BAD\_REQUEST \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-654 & EnumName: GENDER\_NOT\_FOUND \\
+		& Description: Gender code not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-655 & EnumName: SUT\_NOT\_FOUND \\
+		& Description: SUT not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-656 & EnumName: ACTIVE\_INGREDIENT\_NOT\_FOUND \\
+		& Description: Active Ingredient not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+	-657 & EnumName: PRESCRIBED\_EXAM\_NOT\_FOUND \\
+		& Description: Prescribed exam not found \\
+		& HttpStatus: 404 NOT\_FOUND \\
+		& InternalStatus: FAILURE \\
+	\hline
+\end{longtable}
