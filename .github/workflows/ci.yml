@@ -1,4 +1,4 @@
-name: Build Markdown from LaTeX and Deploy
+name: Build HTML from LaTeX and Deploy
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+ contents: read
   pages: write
   id-token: write
 
@@ -23,10 +23,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pandoc
 
-      - name: Convert LaTeX to Markdown
+      - name: Convert LaTeX to HTML
         run: |
           mkdir -p public
-          pandoc main.tex -o public/index.md
+          pandoc main.tex \
+            --standalone \
+            --toc \
+            -o public/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -34,12 +37,11 @@ jobs:
           path: public
 
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
-    needs: build
-    runs-on: ubuntu-latest
 
     steps:
       - name: Deploy to GitHub Pages
